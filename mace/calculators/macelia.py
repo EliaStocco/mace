@@ -13,6 +13,12 @@ from mace.tools import torch_geometric, torch_tools, utils
 
 from mace.calculators.mace import get_model_dtype
 
+# Elia Stocco:
+# - March 5th, 2024: 
+#   this class is identical to `MACECalculator` 
+#   but I had to replace `DipoleMACE` with `AtomicDipolesMACE`
+#   since the former is no longer implemented in `mace`, but the latter is.
+
 class MACEliaCalculator(Calculator):
     """MACE ASE Calculator
     args:
