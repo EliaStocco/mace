@@ -14,10 +14,11 @@ from mace.tools import torch_geometric, torch_tools, utils
 from mace.calculators.mace import get_model_dtype
 
 # Elia Stocco:
-# - March 5th, 2024: 
-#   this class is identical to `MACECalculator` 
+# - March 5th, 2024:
+#   this class is identical to `MACECalculator`
 #   but I had to replace `DipoleMACE` with `AtomicDipolesMACE`
 #   since the former is no longer implemented in `mace`, but the latter is.
+
 
 class MACEliaCalculator(Calculator):
     """MACE ASE Calculator
@@ -137,6 +138,8 @@ class MACEliaCalculator(Calculator):
             for param in model.parameters():
                 param.requires_grad = False
 
+        self._tmp_var = None
+
     def _create_result_tensors(
         self, model_type: str, num_models: int, num_atoms: int
     ) -> dict:
@@ -202,6 +205,13 @@ class MACEliaCalculator(Calculator):
         ret_tensors = self._create_result_tensors(
             self.model_type, self.num_models, len(atoms)
         )
+
+        # useful for further use
+        self._tmp_var = {}
+        self._tmp_var["compute_stress"] = compute_stress
+        self._tmp_var["batch_base"] = batch_base
+        self._tmp_var["ret_tensors"] = ret_tensors
+
         for i, model in enumerate(self.models):
             batch = batch_base.clone()
             out = model(batch.to_dict(), compute_stress=compute_stress)
@@ -315,3 +325,58 @@ class MACEliaCalculator(Calculator):
         if self.num_models == 1:
             return descriptors[0]
         return descriptors
+
+
+class MACEliaBECCalculator(MACEliaCalculator):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.model_type != "AtomicDipolesMACE":
+            raise ValueError("only `AtomicDipolesMACE` allowed")
+
+        self.implemented_properties.extend(["bec"])
+        if len(self.num_models) > 1:
+            self.implemented_properties.extend(["bec_var"])
+
+    def _create_result_tensors(
+        self, model_type: str, num_models: int, num_atoms: int
+    ) -> dict:
+        dict_of_tensors: dict = super()._create_result_tensors(
+            *model_type, num_models, num_atoms
+        )
+        bec = torch.zeros(num_models, num_atoms, 3, 3, device=self.device)
+        dict_of_tensors.update({"bec": bec})
+        return dict_of_tensors
+
+    def calculate(self, atoms=None, properties=None, system_changes=all_changes):
+        super().calculate(atoms, properties, system_changes)
+
+        ret_tensors = self._tmp_var["ret_tensors"]
+        batch_base = self._tmp_var["batch_base"]
+        compute_stress = self._tmp_var["compute_stress"]
+
+        for i, model in enumerate(self.models):
+            batch = batch_base.clone()
+            out = model(batch.to_dict(), compute_stress=compute_stress)
+            dipole = out["dipole"]
+
+            # if y is None or X is None:
+            #     y,X = self.get(pos=pos,cell=cell)
+            # n_batch = len(np.unique(X.batch))
+            # if n_batch != 1:
+            #     raise ValueError("'get_jac' works only with one batch.")
+            # N = len(X.pos.flatten())
+            # jac = torch.full((N,y.shape[0]),torch.nan)
+            # for n in range(y.shape[0]):
+            #     # y[n].backward(retain_graph=True)
+            #     y[n].backward(retain_graph=True)
+            #     jac[:,n] = X.pos.grad.flatten().detach()
+            #     X.pos.grad.data.zero_()
+
+            ret_tensors["bec"][i] = out["bec"].detach()
+
+        self.results["bec"] = torch.mean(ret_tensors["bec"], dim=0).cpu().numpy()
+        if self.num_models > 1:
+            self.results["bec_var"] = (
+                torch.var(ret_tensors["bec"], dim=0, unbiased=False).cpu().numpy()
+            )
