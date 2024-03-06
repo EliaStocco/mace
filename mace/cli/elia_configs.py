@@ -8,11 +8,16 @@ import argparse
 
 import ase.data
 import ase.io
+from ase import Atoms
 import numpy as np
 import torch
+from typing import List, Dict
 
 from mace import data
 from mace.tools import torch_geometric, torch_tools, utils
+from mace.modules.models import AtomicDipolesMACE, AtomicDipolesBECMACE
+from mace.calculators import MACEliaCalculator, MACEliaBECCalculator
+
 
 
 def parse_args() -> argparse.Namespace:
@@ -55,24 +60,13 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_args()
 
-
-def main():
-    args = parse_args()
-    torch_tools.set_default_dtype(args.default_dtype)
-    device = torch_tools.init_device(args.device)
-
-    # Load model
-    model = torch.load(f=args.model, map_location=args.device)
-    model = model.to(
-        args.device
-    )  # shouldn't be necessary but seems to help with CUDA problems
-
-    for param in model.parameters():
-        param.requires_grad = False
-
-    # Load data and prepare input
-    atoms_list = ase.io.read(args.configs, index=":")
+def make_dataloader(atoms_list:List[Atoms],model:torch.nn.Module,batch_size:int):
     configs = [data.config_from_atoms(atoms) for atoms in atoms_list]
+
+    # test
+    # atoms = atoms_list[0]
+    # atoms.set_calculator(calculator)
+    # dipole = atoms.get_dipole_moment()
 
     z_table = utils.AtomicNumberTable([int(z) for z in model.atomic_numbers])
 
@@ -83,45 +77,92 @@ def main():
             )
             for config in configs
         ],
-        batch_size=args.batch_size,
+        batch_size=batch_size,
         shuffle=False,
         drop_last=False,
     )
+    return data_loader
+
+def main():
+    args = parse_args()
+    torch_tools.set_default_dtype(args.default_dtype)
+    device = torch_tools.init_device(args.device)
+
+    # Load model
+    model = torch.load(f=args.model, map_location=args.device)
+    # Change model type
+    model = AtomicDipolesBECMACE.from_parent(model)
+
+    model = model.to(
+        args.device
+    )  # shouldn't be necessary but seems to help with CUDA problems
+    for param in model.parameters():
+        param.requires_grad = False
+
+    # calculator = MACEliaBECCalculator(model_type="MACEliaBECCalculator",model_paths=args.model,device=args.device)
+    
+    # Load data and prepare input
+    atoms_list = ase.io.read(args.configs, index=":")
+
+    # create dataloader
+    data_loader = make_dataloader(atoms_list,model,args.batch_size)
 
     # Collect data
-    contributions_list = []
-    dipoles_list = []
+    all_lists = {
+        "dipole" : [],
+        "becx"   : [],
+        "becy"   : [],
+        "becz"   : []
+    }
+
+    whereto = {
+        "dipole" : "info"  ,
+        "becx"   : "arrays",
+        "becy"   : "arrays",
+        "becz"   : "arrays",
+    }
+
 
     for batch in data_loader:
         batch = batch.to(device)
-        output = model(batch.to_dict(), compute_stress=False)
+        output = model(batch.to_dict(), compute_stress=args.compute_stress)
 
-        if "dipole" in output:
-            dipoles_list.append(torch_tools.to_numpy(output["dipole"]))
+        for k in all_lists.keys():
+            if k in output:
+                all_lists[k].append(torch_tools.to_numpy(output[k]))
 
-        if args.return_contributions:
-            contributions_list.append(torch_tools.to_numpy(output["contributions"]))
+    data:Dict[str,np.ndarray] = {}
+    for k in all_lists.keys():
+        data[k] = np.concatenate(all_lists[k], axis=0)
+        # assert len(atoms_list) == len(data[k])
 
-    dipoles = np.concatenate(dipoles_list, axis=0)
-
-    # assert len(atoms_list) == len(energies) == len(forces_list)
-    assert len(atoms_list) == len(dipoles)
-
-    if args.return_contributions:
-        contributions = np.concatenate(contributions_list, axis=0)
-        assert len(atoms_list) == contributions.shape[0]
+    Nconf  = len(atoms_list)
+    Natoms = atoms_list[0].get_global_number_of_atoms()
+    print("N conf.  : {:d}".format(Nconf))
+    print("N atoms. : {:d}".format(Natoms))
+    for k in all_lists.keys():
+        print("reshaping '{:s}' from {}".format(k,data[k].shape),end="")
+        if whereto[k] == "info":
+            data[k] = data[k].reshape((Nconf,-1))
+        elif whereto[k] == "arrays":
+            data[k] = data[k].reshape((Nconf,Natoms,-1))
+        else:
+            raise ValueError("`whereto[{k}]` can be either `info` or `arrays`.")
+        print(" to {}".format(data[k].shape))
 
     # Store data in atoms objects
-    for i, (atoms, dipole) in enumerate(zip(atoms_list, dipoles)):
+    for n,atoms in enumerate(atoms_list):
         atoms.calc = None  # crucial
-        atoms.info[args.info_prefix + "dipole"] = dipole
-
-        if args.return_contributions:
-            atoms.info[args.info_prefix + "BO_contributions"] = contributions[i]
+        for k in all_lists.keys():
+            if whereto[k] == "info":
+                atoms.info[args.info_prefix + k] = data[k][n]
+            elif whereto[k] == "arrays":
+                atoms.arrays[args.info_prefix + k] = data[k][n]
+            else:
+                raise ValueError("`whereto[{k}]` can be either `info` or `arrays`.")
 
     # Write atoms to output path
     ase.io.write(args.output, images=atoms_list, format="extxyz")
-
 
 if __name__ == "__main__":
     main()
