@@ -90,8 +90,10 @@ def main():
     device = torch_tools.init_device(args.device)
 
     # Load model
-    model:torch.nn.Module = torch.load(f=args.model, map_location=args.device)
+    print("reading model from file '{:s}'".format(args.model))
+    model:AtomicDipolesMACE = torch.load(f=args.model, map_location=args.device)
     # Change model type
+    print("model type: '{:s}'".format(args.model_type))
     if args.model_type == "AtomicDipolesMACE":
         pass
     elif args.model_type == "AtomicDipolesBECMACE": 
@@ -108,18 +110,14 @@ def main():
     # calculator = MACEliaBECCalculator(model_type="MACEliaBECCalculator",model_paths=args.model,device=args.device)
     
     # Load data and prepare input
+    print("reading atomic structure from file '{:s}'".format(args.configs))
     atoms_list = ase.io.read(args.configs, index=":")
 
     # create dataloader
     data_loader = make_dataloader(atoms_list,model,args.batch_size)
 
     # Collect data
-    all_lists = {
-        "dipole" : [],
-        "becx"   : [],
-        "becy"   : [],
-        "becz"   : []
-    }
+    all_lists = {}
 
     whereto = {
         "dipole" : "info"  ,
@@ -133,14 +131,17 @@ def main():
         batch = batch.to(device)
         output = model(batch.to_dict(), compute_stress=args.compute_stress)
 
-        for k in all_lists.keys():
+        for k in whereto.keys():
             if k in output:
-                all_lists[k].append(torch_tools.to_numpy(output[k]))
+                if k not in all_lists:
+                    all_lists[k] = [torch_tools.to_numpy(output[k])]
+                else:
+                    all_lists[k].append(torch_tools.to_numpy(output[k]))
 
     data:Dict[str,np.ndarray] = {}
     for k in all_lists.keys():
         data[k] = np.concatenate(all_lists[k], axis=0)
-        # assert len(atoms_list) == len(data[k])
+
 
     Nconf  = len(atoms_list)
     Natoms = atoms_list[0].get_global_number_of_atoms()
@@ -168,6 +169,7 @@ def main():
                 raise ValueError("`whereto[{k}]` can be either `info` or `arrays`.")
 
     # Write atoms to output path
+    print("saving output to file '{:s}'".format(args.output))
     ase.io.write(args.output, images=atoms_list, format="extxyz")
 
 if __name__ == "__main__":

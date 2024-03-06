@@ -75,14 +75,15 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         "--model",
         help="model type",
         default="MACE",
-        choices=[
-            "BOTNet",
-            "MACE",
-            "ScaleShiftMACE",
-            "ScaleShiftBOTNet",
-            "AtomicDipolesMACE",
-            "EnergyDipolesMACE",
-        ],
+        # choices=[
+        #     "BOTNet",
+        #     "MACE",
+        #     "ScaleShiftMACE",
+        #     "ScaleShiftBOTNet",
+        #     "AtomicDipolesMACE",
+        #     "EnergyDipolesMACE",
+        #     "AtomicDipolesShiftMACE",
+        # ],
     )
     parser.add_argument(
         "--r_max", help="distance cutoff (in Ang)", type=float, default=5.0

@@ -1088,3 +1088,23 @@ class AtomicDipolesBECMACE(AtomicDipolesMACE):
 
         output.update(bec)
         return output
+
+@compile_mode("script")
+class AtomicDipolesShiftMACE(AtomicDipolesMACE):
+
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        self._es_shift = o3.Linear(irreps_in="3x1o", irreps_out="1x1o")
+
+    def forward(self,
+        data: Dict[str, torch.Tensor],
+        training: bool = False,  # pylint: disable=W0613
+        compute_force: bool = False,
+        compute_virials: bool = False,
+        compute_stress: bool = False,
+        compute_displacement: bool = False,
+    ) -> Dict[str, Optional[torch.Tensor]]:
+        output = super().forward(data,training,compute_force,compute_virials,compute_stress,compute_displacement)
+        shift = self._es_shift(data["cell"].reshape((-1,9)))
+        output["dipole"] += shift
+        return output
