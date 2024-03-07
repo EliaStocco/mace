@@ -12,7 +12,7 @@ from e3nn import o3
 from e3nn.util.jit import compile_mode
 
 from mace.data import AtomicData
-from mace.tools.scatter import scatter_sum
+from mace.tools.scatter import scatter_sum, scatter_mean
 
 from .blocks import (
     AtomicEnergiesBlock,
@@ -34,7 +34,7 @@ from .utils import (
     get_symmetric_displacement,
 )
 
-from torch_scatter import scatter_mean
+# from torch_scatter import scatter_mean
 
 # pylint: disable=C0302
 
