@@ -62,6 +62,7 @@ class AtomicData(torch_geometric.data.Data):
         virials: Optional[torch.Tensor],  # [1,3,3]
         dipole: Optional[torch.Tensor],  # [, 3]
         charges: Optional[torch.Tensor],  # [n_nodes, ]
+        delta_positions: Optional[torch.Tensor],  # [n_nodes, 3]
     ):
         # Check shapes
         num_nodes = node_attrs.shape[0]
@@ -83,6 +84,7 @@ class AtomicData(torch_geometric.data.Data):
         assert virials is None or virials.shape == (1, 3, 3)
         assert dipole is None or dipole.shape[-1] == 3
         assert charges is None or charges.shape == (num_nodes,)
+        assert delta_positions.shape == positions.shape
         # Aggregate data
         data = {
             "num_nodes": num_nodes,
@@ -103,6 +105,7 @@ class AtomicData(torch_geometric.data.Data):
             "virials": virials,
             "dipole": dipole,
             "charges": charges,
+            "delta_positions": delta_positions,
         }
         super().__init__(**data)
 
@@ -210,6 +213,10 @@ class AtomicData(torch_geometric.data.Data):
             virials=virials,
             dipole=dipole,
             charges=charges,
+            delta_positions=torch.tensor(
+                config.positions - config.positions.mean(axis=0),
+                dtype=torch.get_default_dtype(),
+            ),
         )
 
 
