@@ -40,6 +40,7 @@ from .models import (
     AtomicDipolesShiftMACE,
     AtomicDipolesMACElia,
     AtomicDipolesMACEliaMTP,
+    AtomicDipolesMACEliaBias,
 )
 from .radial import BesselBasis, GaussianBasis, PolynomialCutoff
 from .symmetric_contraction import SymmetricContraction
@@ -96,6 +97,7 @@ __all__ = [
     "AtomicDipolesBECMACE",
     "AtomicDipolesShiftMACE",
     "AtomicDipolesMACElia",
+    "AtomicDipolesMACEliaBias",
     "AtomicDipolesMACEliaMTP",
     "WeightedEnergyForcesLoss",
     "WeightedForcesLoss",

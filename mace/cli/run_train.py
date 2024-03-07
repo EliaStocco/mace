@@ -81,7 +81,7 @@ def main() -> None:
     )
     # yapf: enable
     logging.info(z_table)
-    if args.model in ["AtomicDipolesMACE","AtomicDipolesShiftMACE","AtomicDipolesMACElia","AtomicDipolesMACEliaMTP"]:
+    if args.model in ["AtomicDipolesMACE","AtomicDipolesShiftMACE","AtomicDipolesMACElia","AtomicDipolesMACEliaMTP","AtomicDipolesMACEliaBias"]:
         atomic_energies = None
         dipole_only = True
         compute_dipole = True
@@ -296,7 +296,7 @@ def main() -> None:
             interaction_cls_first=modules.interaction_classes[args.interaction_first],
             MLP_irreps=o3.Irreps(args.MLP_irreps),
         )
-    elif args.model in ["AtomicDipolesMACE","AtomicDipolesShiftMACE","AtomicDipolesMACElia","AtomicDipolesMACEliaMTP"]:
+    elif args.model in ["AtomicDipolesMACE","AtomicDipolesShiftMACE","AtomicDipolesMACElia","AtomicDipolesMACEliaMTP","AtomicDipolesMACEliaBias"]:
         # std_df = modules.scaling_classes["rms_dipoles_scaling"](train_loader)
         assert args.loss == "dipole", "Use dipole loss with AtomicDipolesMACE model"
         assert (
@@ -310,6 +310,8 @@ def main() -> None:
             dipole_class = modules.AtomicDipolesMACElia
         elif args.model == "AtomicDipolesMACEliaMTP":
             dipole_class = modules.AtomicDipolesMACEliaMTP
+        elif args.model == "AtomicDipolesMACEliaBias":
+            dipole_class = modules.AtomicDipolesMACEliaBias
         else:
             dipole_class = None
         model = dipole_class(
