@@ -12,19 +12,18 @@ from ase import Atoms
 import numpy as np
 import torch
 from typing import List, Dict
-
 from mace import data
 from mace.tools import torch_geometric, torch_tools, utils
-from mace.modules.models import AtomicDipolesMACE, AtomicDipolesBECMACE
-# from mace.calculators import MACEliaCalculator, MACEliaBECCalculator
-
+# from mace.modules.models import AtomicDipolesMACE, AtomicDipolesBECMACE
+from mace.modules import models
+from mace.modules.models import addBEC2class
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--configs", help="path to XYZ configurations", required=True)
     parser.add_argument("--model", help="path to model", required=True)
-    parser.add_argument("--model_type", help="model type (default: 'AtomicDipolesMACE')", required=False, choices=["AtomicDipolesMACE", "AtomicDipolesBECMACE"])
+    parser.add_argument("--model_type", help="model type (default: 'AtomicDipolesMACE')", required=True)
     parser.add_argument("--output", help="output path", required=True)
     parser.add_argument(
         "--device",
@@ -91,15 +90,22 @@ def main():
 
     # Load model
     print("reading model from file '{:s}'".format(args.model))
-    model:AtomicDipolesMACE = torch.load(f=args.model, map_location=args.device)
+    model:torch.nn.Module = torch.load(f=args.model, map_location=args.device)
     # Change model type
     print("model type: '{:s}'".format(args.model_type))
-    if args.model_type == "AtomicDipolesMACE":
-        pass
-    elif args.model_type == "AtomicDipolesBECMACE": 
-        model = AtomicDipolesBECMACE.from_parent(model)
-    else:
-        raise ValueError("`model_type` can be only [`AtomicDipolesMACE`,`AtomicDipolesBECMACE`]")
+    
+    if str(args.model_type).endswith("_BEC"):
+        parent_class = str(args.model_type).split('_BEC')[0]
+        parent_class = getattr(models, parent_class)
+        child_class = addBEC2class(parent_class)
+        model = child_class.from_parent(model)
+
+    # if args.model_type == "AtomicDipolesMACE":
+    #     pass
+    # elif args.model_type == "AtomicDipolesBECMACE": 
+    #     model = AtomicDipolesBECMACE.from_parent(model)
+    # else:
+    #     raise ValueError("`model_type` can be only [`AtomicDipolesMACE`,`AtomicDipolesBECMACE`]")
 
     model = model.to(
         args.device

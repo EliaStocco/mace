@@ -1253,65 +1253,65 @@ class EnergyDipolesMACE(torch.nn.Module):
         return output
 
 
-@compile_mode("script")
-class AtomicDipolesBECMACE(AtomicDipolesMACElia):
+# @compile_mode("script")
+# class AtomicDipolesBECMACElia(AtomicDipolesMACElia):
 
-    @classmethod
-    def from_parent(cls, obj):
-        """Cast a `AtomicDipolesMACE` (parent class) object to a `AtomicDipolesBECMACE` (child class) without copying all the attributes."""
-        obj.__class__ = AtomicDipolesBECMACE
-        return obj
+#     @classmethod
+#     def from_parent(cls, obj):
+#         """Cast a `AtomicDipolesMACElia` (parent class) object to a `AtomicDipolesBECMACElia` (child class) without copying all the attributes."""
+#         obj.__class__ = AtomicDipolesBECMACElia
+#         return obj
 
-    def forward(
-        self,
-        data: Dict[str, torch.Tensor],
-        training: bool = False,  # pylint: disable=W0613
-        compute_force: bool = False,
-        compute_virials: bool = False,
-        compute_stress: bool = False,
-        compute_displacement: bool = False,
-    ) -> Dict[str, Optional[torch.Tensor]]:
+#     def forward(
+#         self,
+#         data: Dict[str, torch.Tensor],
+#         training: bool = False,  # pylint: disable=W0613
+#         compute_force: bool = False,
+#         compute_virials: bool = False,
+#         compute_stress: bool = False,
+#         compute_displacement: bool = False,
+#     ) -> Dict[str, Optional[torch.Tensor]]:
 
-        if training:
-            raise ValueError("`AtomicDipolesBECMACE` can be used only in `eval` mode.")
+#         if training:
+#             raise ValueError("`AtomicDipolesBECMACE` can be used only in `eval` mode.")
 
-        # data.keys():
-        # dict_keys(['batch', 'cell', 'charges', 'dipole', 'edge_index',
-        # 'energy', 'energy_weight', 'forces', 'forces_weight', 'node_attrs',
-        # 'positions', 'ptr', 'shifts', 'stress', 'stress_weight', 'unit_shifts',
-        # 'virials', 'virials_weight', 'weight'])
+#         # data.keys():
+#         # dict_keys(['batch', 'cell', 'charges', 'dipole', 'edge_index',
+#         # 'energy', 'energy_weight', 'forces', 'forces_weight', 'node_attrs',
+#         # 'positions', 'ptr', 'shifts', 'stress', 'stress_weight', 'unit_shifts',
+#         # 'virials', 'virials_weight', 'weight'])
 
-        # compute the dipoles
-        output: dict = super().forward(
-            data,
-            training,
-            compute_force,
-            compute_virials,
-            compute_stress,
-            compute_displacement,
-        )
+#         # compute the dipoles
+#         output: dict = super().forward(
+#             data,
+#             training,
+#             compute_force,
+#             compute_virials,
+#             compute_stress,
+#             compute_displacement,
+#         )
 
-        bec = {}
-        for l, n in zip(["becx", "becy", "becz"], [0, 1, 2]):
-            dipole: torch.Tensor = output["dipole"][:, n]
-            # dipole.backward(gradient=data["positions"],inputs=data["positions"])
-            # bec[l] = data["positions"].grad
+#         bec = {}
+#         for l, n in zip(["becx", "becy", "becz"], [0, 1, 2]):
+#             dipole: torch.Tensor = output["dipole"][:, n]
+#             # dipole.backward(gradient=data["positions"],inputs=data["positions"])
+#             # bec[l] = data["positions"].grad
 
-            # copied and modified from `compute_forces` (`/mace/modules/utils.py`)
-            grad_outputs: List[Optional[torch.Tensor]] = [torch.ones_like(dipole)]
-            bec[l] = torch.autograd.grad(
-                outputs=[dipole],  # [n_graphs, ]
-                inputs=[data["positions"]],  # [n_nodes, 3]
-                grad_outputs=grad_outputs,
-                retain_graph=True,  # Make sure the graph is not destroyed during training
-                create_graph=False,  # Create graph for second derivative
-                allow_unused=False,  # For complete dissociation turn to true
-            )[0]
-            if bec[l].shape != data["positions"].shape:
-                raise ValueError("mismatch in shapes")
+#             # copied and modified from `compute_forces` (`/mace/modules/utils.py`)
+#             grad_outputs: List[Optional[torch.Tensor]] = [torch.ones_like(dipole)]
+#             bec[l] = torch.autograd.grad(
+#                 outputs=[dipole],  # [n_graphs, ]
+#                 inputs=[data["positions"]],  # [n_nodes, 3]
+#                 grad_outputs=grad_outputs,
+#                 retain_graph=True,  # Make sure the graph is not destroyed during training
+#                 create_graph=False,  # Create graph for second derivative
+#                 allow_unused=False,  # For complete dissociation turn to true
+#             )[0]
+#             if bec[l].shape != data["positions"].shape:
+#                 raise ValueError("mismatch in shapes")
 
-        output.update(bec)
-        return output
+#         output.update(bec)
+#         return output
 
 
 @compile_mode("script")
@@ -1415,3 +1415,71 @@ class AtomicDipolesMACEliaBias(AtomicDipolesMACElia):
 
         return output
 
+def addBEC2class(dipole_class: torch.nn.Module) -> torch.nn.Module:
+
+    @compile_mode("script")
+    class class_with_BEC(dipole_class):
+        """Inherits from a class that predicts dipoles, and add the evaluation of their spatial derivaties to 'forward'."""
+
+        @classmethod
+        def from_parent(cls, obj):
+            """Cast a parent class object to a child class object without copying all the attributes."""
+            obj.__class__ = class_with_BEC
+            obj.__name__ = "{:s}_BEC".format(dipole_class.__name__)
+            return obj
+
+        def forward(
+            self,
+            data: Dict[str, torch.Tensor],
+            training: bool = False,  # pylint: disable=W0613
+            compute_force: bool = False,
+            compute_virials: bool = False,
+            compute_stress: bool = False,
+            compute_displacement: bool = False,
+        ) -> Dict[str, Optional[torch.Tensor]]:
+
+            if training:
+                raise ValueError("`{:s}` can be used only in `eval` mode.".format(dipole_class))
+
+            # data.keys():
+            # dict_keys(['batch', 'cell', 'charges', 'dipole', 'edge_index',
+            # 'energy', 'energy_weight', 'forces', 'forces_weight', 'node_attrs',
+            # 'positions', 'ptr', 'shifts', 'stress', 'stress_weight', 'unit_shifts',
+            # 'virials', 'virials_weight', 'weight'])
+
+            # compute the dipoles
+            output: dict = super().forward(
+                data,
+                training,
+                compute_force,
+                compute_virials,
+                compute_stress,
+                compute_displacement,
+            )
+
+            if "dipole" not in output:
+                raise ValueError("Parent class '{:s}' should predict 'dipole'.".format(dipole_class.__name__))
+
+            bec = {}
+            for l, n in zip(["becx", "becy", "becz"], [0, 1, 2]):
+                dipole: torch.Tensor = output["dipole"][:, n]
+                # dipole.backward(gradient=data["positions"],inputs=data["positions"])
+                # bec[l] = data["positions"].grad
+
+                # copied and modified from `compute_forces` (`/mace/modules/utils.py`)
+                grad_outputs: List[Optional[torch.Tensor]] = [torch.ones_like(dipole)]
+                bec[l] = torch.autograd.grad(
+                    outputs=[dipole],  # [n_graphs, ]
+                    inputs=[data["positions"]],  # [n_nodes, 3]
+                    grad_outputs=grad_outputs,
+                    retain_graph=True,  # Make sure the graph is not destroyed during training
+                    create_graph=False,  # Create graph for second derivative
+                    allow_unused=False,  # For complete dissociation turn to true
+                )[0]
+                if bec[l].shape != data["positions"].shape:
+                    raise ValueError("mismatch in shapes")
+
+            output.update(bec)
+            return output
+        
+    return class_with_BEC

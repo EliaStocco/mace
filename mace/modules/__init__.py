@@ -36,7 +36,6 @@ from .models import (
     EnergyDipolesMACE,
     ScaleShiftBOTNet,
     ScaleShiftMACE,
-    AtomicDipolesBECMACE,
     AtomicDipolesShiftMACE,
     AtomicDipolesMACElia,
     AtomicDipolesMACEliaMTP,
