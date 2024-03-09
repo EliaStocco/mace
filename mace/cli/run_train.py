@@ -81,7 +81,18 @@ def main() -> None:
     )
     # yapf: enable
     logging.info(z_table)
-    if args.model in ["AtomicDipolesMACE","AtomicDipolesShiftMACE","AtomicDipolesMACElia","AtomicDipolesMACEliaMTP","AtomicDipolesMACEliaBias"]:
+    if args.model in ["DipolesPointCharges"]:
+        dipole_only = True
+        compute_dipole = True
+        compute_energy = False
+        args.compute_forces = False
+        compute_virials = False
+        args.compute_stress = False
+        # atomic_energies: np.ndarray = np.array(z_table.zs)
+        # logging.info(f"Atomic energies: {atomic_energies.tolist()}")
+    elif args.model in ["AtomicDipolesMACE","AtomicDipolesShiftMACE",\
+                      "AtomicDipolesMACElia","AtomicDipolesMACEliaMTP",\
+                        "AtomicDipolesMACEliaBias"]:
         atomic_energies = None
         dipole_only = True
         compute_dipole = True
@@ -296,7 +307,9 @@ def main() -> None:
             interaction_cls_first=modules.interaction_classes[args.interaction_first],
             MLP_irreps=o3.Irreps(args.MLP_irreps),
         )
-    elif args.model in ["AtomicDipolesMACE","AtomicDipolesShiftMACE","AtomicDipolesMACElia","AtomicDipolesMACEliaMTP","AtomicDipolesMACEliaBias"]:
+    elif args.model in ["AtomicDipolesMACE","AtomicDipolesShiftMACE",\
+                        "AtomicDipolesMACElia","AtomicDipolesMACEliaMTP",\
+                            "AtomicDipolesMACEliaBias","DipolesPointCharges"]:
         # std_df = modules.scaling_classes["rms_dipoles_scaling"](train_loader)
         assert args.loss == "dipole", "Use dipole loss with AtomicDipolesMACE model"
         assert (
@@ -312,6 +325,8 @@ def main() -> None:
             dipole_class = modules.AtomicDipolesMACEliaMTP
         elif args.model == "AtomicDipolesMACEliaBias":
             dipole_class = modules.AtomicDipolesMACEliaBias
+        elif args.model == "DipolesPointCharges":
+            dipole_class = modules.DipolesPointCharges
         else:
             dipole_class = None
         model = dipole_class(
