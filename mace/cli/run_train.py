@@ -16,6 +16,7 @@ from e3nn import o3
 from torch.optim.swa_utils import SWALR, AveragedModel
 from torch_ema import ExponentialMovingAverage
 
+import os
 import mace
 from mace import data, modules, tools
 from mace.tools import torch_geometric
@@ -88,6 +89,7 @@ def main() -> None:
         args.compute_forces = False
         compute_virials = False
         args.compute_stress = False
+        atomic_energies = None
         # atomic_energies: np.ndarray = np.array(z_table.zs)
         # logging.info(f"Atomic energies: {atomic_energies.tolist()}")
     elif args.model in ["AtomicDipolesMACE","AtomicDipolesShiftMACE",\
@@ -578,6 +580,9 @@ def main() -> None:
         if args.save_cpu:
             model = model.to("cpu")
         torch.save(model, model_path)
+
+        if not os.path.exists(args.model_dir):
+            os.mkdir(args.model_dir)
 
         if swa_eval:
             torch.save(model, Path(args.model_dir) / (args.name + "_swa.model"))
