@@ -33,6 +33,16 @@ def compute_rel_rmse(delta: np.ndarray, target_val: np.ndarray) -> float:
     target_norm = np.sqrt(np.mean(np.square(target_val))).item()
     return np.sqrt(np.mean(np.square(delta))).item() / (target_norm + 1e-9) * 100
 
+# Elia Stocco
+def compute_rmse_vector(delta: np.ndarray) -> float:
+    module = np.linalg.norm(delta,dim=1)
+    return np.mean(module).item()
+
+# Elia Stocco
+def compute_rel_rmse_vector(delta: np.ndarray, target_val: np.ndarray) -> float:
+    rmse = compute_rmse_vector(delta)
+    return 100 * target_val/rmse
+
 
 def compute_q95(delta: np.ndarray) -> float:
     return np.percentile(np.abs(delta), q=95)

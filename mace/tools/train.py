@@ -25,6 +25,8 @@ from .utils import (
     compute_rel_mae,
     compute_rel_rmse,
     compute_rmse,
+    compute_rel_rmse_vector,
+    compute_rmse_vector,
 )
 
 
@@ -383,8 +385,11 @@ def evaluate(
         aux["mae_mu_per_atom"] = compute_mae(delta_mus_per_atom)
         aux["rel_mae_mu"] = compute_rel_mae(delta_mus, mus)
         aux["rmse_mu"] = compute_rmse(delta_mus)
-        aux["rmse_mu_per_atom"] = compute_rmse(delta_mus_per_atom)
-        aux["rel_rmse_mu"] = compute_rel_rmse(delta_mus, mus)
+        # Elia Stocco
+        aux["rmse_mu_per_atom"] = compute_rmse_vector(delta_mus_per_atom)
+        aux["rel_rmse_mu"] = compute_rel_rmse_vector(delta_mus, mus)
+        # aux["rmse_mu_per_atom"] = compute_rmse(delta_mus_per_atom)
+        # aux["rel_rmse_mu"] = compute_rel_rmse(delta_mus, mus)
         aux["q95_mu"] = compute_q95(delta_mus)
 
     aux["time"] = time.time() - start_time
