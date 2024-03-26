@@ -936,8 +936,8 @@ class AtomicDipolesMACElia(torch.nn.Module):
                     LinearDipoleReadoutBlock(hidden_irreps, dipole_only=self.ES_dipole_only)
                 )
 
-        self._charges = None
-        self._num_graphs = None
+        # self._charges = None
+        # self._num_graphs = None
 
     def forward(
         self,
@@ -1022,8 +1022,8 @@ class AtomicDipolesMACElia(torch.nn.Module):
             "dipole": total_dipole,
             "atomic_dipoles": atomic_dipoles,
         }
-        self._charges = charges # for child classes
-        self._num_graphs = num_graphs
+        # self._charges = charges # for child classes
+        # self._num_graphs = num_graphs
         return output
 
 
@@ -1311,7 +1311,7 @@ class AtomicDipolesShiftMACE(AtomicDipolesMACElia):
         return output
 
 @compile_mode("script")
-class AtomicDipolesMACEliaMTP(AtomicDipolesMACElia):
+class AtomicDipolesMACEliaBias(AtomicDipolesMACElia):
     """Dipole with the Modr Theory of Polarization + fixed charges contribution."""
 
     def __init__(self,**kwargs):
@@ -1352,7 +1352,7 @@ class AtomicDipolesMACEliaMTP(AtomicDipolesMACElia):
 
 
 @compile_mode("script")
-class AtomicDipolesMACEliaBias(AtomicDipolesMACElia):
+class AtomicDipolesMACEliaMTP(AtomicDipolesMACElia):
     """Dipole with the Modern Theory of Polarization + fixed charges contribution."""
 
     def __init__(self,**kwargs):
@@ -1379,7 +1379,10 @@ class AtomicDipolesMACEliaBias(AtomicDipolesMACElia):
             compute_displacement,
         )
 
-        output["dipole"] = output["dipole"] + self.jump(data["cell"].reshape((-1,9)))
+        jump = self.jump(data["cell"].reshape((-1,9)))
+        # jump[:,0] = 0
+        # jump[:,1] = 0
+        output["dipole"] = output["dipole"] + jump/100.
 
         return output
 
