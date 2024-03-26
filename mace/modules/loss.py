@@ -70,20 +70,21 @@ def mean_squared_error_forces(ref: Batch, pred: TensorDict) -> torch.Tensor:
     )  # []
 
 
-# def weighted_mean_squared_error_dipole(ref: Batch, pred: TensorDict) -> torch.Tensor:
-#     # dipole: [n_graphs, ]
-#     num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).unsqueeze(-1)  # [n_graphs,1]
-#     return torch.mean(torch.square((ref["dipole"] - pred["dipole"]) / num_atoms))  # []
-#     # return torch.mean(torch.square((torch.reshape(ref['dipole'], pred["dipole"].shape) - pred['dipole']) / num_atoms))  # []
-
-# Elia Stocco
 def weighted_mean_squared_error_dipole(ref: Batch, pred: TensorDict) -> torch.Tensor:
     # dipole: [n_graphs, ]
-    num_atoms:torch.Tensor = (ref.ptr[1:] - ref.ptr[:-1])# .unsqueeze(-1)  # [n_graphs,1]
-    dipole_modulus:torch.Tensor = torch.linalg.vector_norm(ref["dipole"] - pred["dipole"],dim=1)
-    return (dipole_modulus/num_atoms).mean()
-    #return torch.mean(torch.square((ref["dipole"] - pred["dipole"]) / num_atoms))  # []
+    num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).unsqueeze(-1)  # [n_graphs,1]
+    return torch.mean(torch.square((ref["dipole"] - pred["dipole"]) / num_atoms))  # []
     # return torch.mean(torch.square((torch.reshape(ref['dipole'], pred["dipole"].shape) - pred['dipole']) / num_atoms))  # []
+
+# # Elia Stocco
+# def weighted_mean_squared_error_dipole(ref: Batch, pred: TensorDict) -> torch.Tensor:
+#     # dipole: [n_graphs, ]
+#     num_atoms:torch.Tensor = (ref.ptr[1:] - ref.ptr[:-1])# .unsqueeze(-1)  # [n_graphs,1]
+#     delta = ref["dipole"] - pred["dipole"]
+#     dipole_modulus_squared:torch.Tensor = torch.square(delta).sum(dim=1)
+#     return (dipole_modulus_squared/num_atoms).mean()
+#     #return torch.mean(torch.square((ref["dipole"] - pred["dipole"]) / num_atoms))  # []
+#     # return torch.mean(torch.square((torch.reshape(ref['dipole'], pred["dipole"].shape) - pred['dipole']) / num_atoms))  # []
 
 
 class WeightedEnergyForcesLoss(torch.nn.Module):
