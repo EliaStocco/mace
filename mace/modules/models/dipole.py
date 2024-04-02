@@ -366,9 +366,10 @@ class AtomicDipolesMACElia(BaseDipoleClass):
                 assert (
                     len(hidden_irreps) > 1
                 ), "To predict dipoles use at least l=1 hidden_irreps"
-                hidden_irreps_out = str(
-                    hidden_irreps[1]
-                )  # Select only l=1 vectors for last layer
+                hidden_irreps_out = f'{hidden_irreps[1][0]}x0e+'+str(hidden_irreps[1])
+                # hidden_irreps_out = str(
+                #     hidden_irreps[1]
+                # )  # Select only l=1 vectors for last layer
             else:
                 hidden_irreps_out = hidden_irreps
             inter = interaction_cls(
@@ -485,7 +486,7 @@ class AtomicDipolesMACElia(BaseDipoleClass):
 
         output = {
             "dipole": total_dipole,
-            "atomic_dipoles": atomic_dipoles,
+            # "atomic_dipoles": atomic_dipoles,
         }
         # self._charges = charges # for child classes
         # self._num_graphs = num_graphs
