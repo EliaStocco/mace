@@ -32,7 +32,7 @@ def add_natoms(info):
     if type(shape) == int:
         return (info[0], (shape,"natoms",3,))
     else:
-        return (info[0], shape + ("natoms",3,))
+        return (info[0], ("natoms",3,) + shape)
 
 def get_d_prop_dR(props,basecls:MACEBaseModel,rename):
     # der = [None]*len(props)
@@ -100,50 +100,25 @@ def add_dR( basecls:MACEBaseModel,\
             )
 
             for prop in self.to_diff_props:
-                tmp = compute_dielectric_gradients(
+                array = compute_dielectric_gradients(
                     dielectric=output[prop],
                     positions=data["positions"],
                 )
                 name = "{:s}_dR".format(prop)
                 name = name if name not in self.rename_dR else self.rename_dR[name]
 
-                # Determine the number of axes: (atom, positions coord, output coord)
-                num_axes = tmp.dim()
+                # # Determine the number of axes: (atom, positions coord, output coord)
+                # num_axes = tmp.dim()
 
-                # Permute the axis order
-                permuted_order = list(range(num_axes))
-                permuted_order = [permuted_order[-1]] + permuted_order[:-1]  # Move last axis to the front
-                permuted_tensor = tmp.permute(permuted_order)
+                # # Permute the axis order
+                # permuted_order = list(range(num_axes))
+                # permuted_order = [permuted_order[-1]] + permuted_order[:-1]  # Move last axis to the front
+                # permuted_tensor = tmp.permute(permuted_order)
 
                 # (output coord, atom, positions coord)
-                output[name] = permuted_tensor
+                output[name] = array
 
             return output
-
-            # if "dipole" not in output:
-            #     raise ValueError("Parent class '{:s}' should predict 'dipole'.".format(basecls.__name__))
-
-            # bec:Dict[str,torch.Tensor] = dict()
-            # for l, n in zip(["becx", "becy", "becz"], [0, 1, 2]):
-            #     dipole: torch.Tensor = output["dipole"][:, n]
-            #     # dipole.backward(gradient=data["positions"],inputs=data["positions"])
-            #     # bec[l] = data["positions"].grad
-
-            #     # copied and modified from `compute_forces` (`/mace/modules/utils.py`)
-            #     grad_outputs: List[Optional[torch.Tensor]] = [torch.ones_like(dipole)]
-            #     bec[l] = torch.autograd.grad(
-            #         outputs=[dipole],  # [n_graphs, ]
-            #         inputs=[data["positions"]],  # [n_nodes, 3]
-            #         grad_outputs=grad_outputs,
-            #         retain_graph=True,  # Make sure the graph is not destroyed during training
-            #         create_graph=False,  # Create graph for second derivative
-            #         allow_unused=False,  # For complete dissociation turn to true
-            #     )[0]
-            #     if bec[l].shape != data["positions"].shape:
-            #         raise ValueError("mismatch in shapes")
-
-            # output.update(bec)
-            # return output
         
     return class_with_dR
 
@@ -151,4 +126,4 @@ def add_dR( basecls:MACEBaseModel,\
 
 AtomicDipolesMACElia_BEC = add_dR(basecls=AtomicDipolesMACElia,
                                   diff_props=["dipole"],
-                                  rename={"dipole_dR":"bec"})
+                                  rename={"dipole_dR":"BEC"})
