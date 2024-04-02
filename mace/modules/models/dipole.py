@@ -454,6 +454,13 @@ class AtomicDipolesMACElia(BaseDipoleClass):
             )
             # print(readout.irreps_out)
             node_dipoles = readout(node_feats).squeeze(-1)  # [n_nodes,3]
+
+            # ensure charge neutrality
+            charges = node_dipoles[:, 0]
+            mean = scatter_mean(charges, data["batch"])
+            charges = charges - mean.index_select(0, data["batch"])
+            node_dipoles[:, 0] = charges
+
             dipoles.append(node_dipoles)
 
         # Compute the dipoles
