@@ -16,7 +16,7 @@ from mace import data
 from mace.tools import torch_geometric, torch_tools, utils
 # from mace.modules.models import AtomicDipolesMACE, AtomicDipolesBECMACE
 from mace.modules import models
-from mace.modules.models import addBEC2class
+from mace.modules.models import get_model
 
 
 def parse_args() -> argparse.Namespace:
@@ -60,7 +60,7 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_args()
 
-def make_dataloader(atoms_list:List[Atoms],model:torch.nn.Module,batch_size:int):
+def make_dataloader(atoms_list:List[Atoms],model:torch.nn.Module,batch_size:int)->torch_geometric.dataloader.DataLoader:
     configs = [data.config_from_atoms(atoms) for atoms in atoms_list]
 
     # test
@@ -90,15 +90,18 @@ def main():
 
     # Load model
     print("reading model from file '{:s}'".format(args.model))
-    model:torch.nn.Module = torch.load(f=args.model, map_location=args.device)
+    # model:torch.nn.Module = torch.load(f=args.model, map_location=args.device)
+    model = get_model(  model_path=args.model,
+                        model_type=args.model_type,
+                        device=args.device  )
     # Change model type
-    print("model type: '{:s}'".format(args.model_type))
-    
-    if str(args.model_type).endswith("_BEC"):
-        parent_class = str(args.model_type).split('_BEC')[0]
-        parent_class = getattr(models, parent_class)
-        child_class = addBEC2class(parent_class)
-        model = child_class.from_parent(model)
+    # print("model type: '{:s}'".format(args.model_type))
+
+    # if str(args.model_type).endswith("_BEC"):
+    #     parent_class = str(args.model_type).split('_BEC')[0]
+    #     parent_class = getattr(models, parent_class)
+    #     child_class = addBEC2class(parent_class)
+    #     model = child_class.from_parent(model)
 
     # if args.model_type == "AtomicDipolesMACE":
     #     pass
@@ -120,29 +123,41 @@ def main():
     atoms_list = ase.io.read(args.configs, index=":")
 
     # create dataloader
-    data_loader = make_dataloader(atoms_list,model,args.batch_size)
+    data_loader:torch_geometric.dataloader.DataLoader = make_dataloader(atoms_list,model,args.batch_size)
 
     # Collect data
     all_lists = {}
 
-    whereto = {
-        "dipole" : "info"  ,
-        "becx"   : "arrays",
-        "becy"   : "arrays",
-        "becz"   : "arrays",
-    }
+    # whereto = {
+    #     "dipole" : "info"  ,
+    #     "becx"   : "arrays",
+    #     "becy"   : "arrays",
+    #     "becz"   : "arrays",
+    # }
+    whereto = {}
 
 
     for batch in data_loader:
         batch = batch.to(device)
-        output = model(batch.to_dict(), compute_stress=args.compute_stress)
+        output:dict = model(batch.to_dict(), compute_stress=args.compute_stress)
 
-        for k in whereto.keys():
-            if k in output:
-                if k not in all_lists:
-                    all_lists[k] = [torch_tools.to_numpy(output[k])]
-                else:
-                    all_lists[k].append(torch_tools.to_numpy(output[k]))
+        for k in output.keys():
+            if k not in model.implemented_properties:
+                raise ValueError("coding error")
+            # if 'natoms' in model.implemented_properties[k][1]:
+            #     # arrays
+            #     pass
+            # elif isinstance(model.implemented_properties[k][1],int) or len(model.implemented_properties[k][1]) == 1 :
+            #     # info
+            # else:
+            #     raise ValueError("coding error")
+
+        # for k in whereto.keys():
+        #     if k in output:
+            if k not in all_lists:
+                all_lists[k] = [torch_tools.to_numpy(output[k])]
+            else:
+                all_lists[k].append(torch_tools.to_numpy(output[k]))
 
     data:Dict[str,np.ndarray] = {}
     for k in all_lists.keys():
@@ -154,6 +169,17 @@ def main():
     print("N conf.  : {:d}".format(Nconf))
     print("N atoms. : {:d}".format(Natoms))
     for k in all_lists.keys():
+        # print("reshaping '{:s}' from {}".format(k,data[k].shape),end="")
+        if isinstance(model.implemented_properties[k][1],int) or len(model.implemented_properties[k][1]) == 1 :
+            # info
+            whereto[k] = "info"
+        elif 'natoms' in model.implemented_properties[k][1]:
+            # arrays
+            whereto[k] = "arrays"
+        else:
+            raise ValueError("coding error")
+        
+    for k in all_lists.keys():    
         print("reshaping '{:s}' from {}".format(k,data[k].shape),end="")
         if whereto[k] == "info":
             data[k] = data[k].reshape((Nconf,-1))

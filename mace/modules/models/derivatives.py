@@ -30,7 +30,7 @@ def compute_dielectric_gradients(
 def add_natoms(info):
     shape = info[1]
     if type(shape) == int:
-        return (info[0], (shape,"natoms",3,))
+        return (info[0], ("natoms",3,shape))
     else:
         return (info[0], ("natoms",3,) + shape)
 
@@ -44,6 +44,9 @@ def get_d_prop_dR(props,basecls:MACEBaseModel,rename):
         name ="{:s}_dR".format(prop)
         name = name if name not in rename else rename[name]
         der[name] = add_natoms(ip[prop])
+        if ip[prop][1] == 3:
+            for n,i in enumerate(["x","y","z"]):
+                der["{:s}{:s}".format(name,i)] = (ip[prop][0], ("natoms",3))
     return der
 
 
@@ -117,6 +120,9 @@ def add_dR( basecls:MACEBaseModel,\
 
                 # (output coord, atom, positions coord)
                 output[name] = array
+                if output[prop].shape[1] == 3:
+                    for n,i in enumerate(["x","y","z"]):
+                        output["{:s}{:s}".format(name,i)] = array[:,:,n]
 
             return output
         
