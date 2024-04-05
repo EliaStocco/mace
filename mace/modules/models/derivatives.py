@@ -1,8 +1,10 @@
-from typing import Tuple, Dict, List, Optional
+from typing import Dict, List, Optional
 import torch
 from e3nn.util.jit import compile_mode
-from .general import BaseDipoleClass, MACEBaseModel
+from .general import MACEBaseModel
 from .dipole import AtomicDipolesMACElia
+from .dipole import AtomicDipolesMACE
+from .dipole import AtomicDipolesMACE_MTP
 
 def compute_dielectric_gradients(
     dielectric: torch.Tensor,
@@ -131,5 +133,13 @@ def add_dR( basecls:MACEBaseModel,\
 
 
 AtomicDipolesMACElia_BEC = add_dR(basecls=AtomicDipolesMACElia,
+                                  diff_props=["dipole"],
+                                  rename={"dipole_dR":"BEC"})
+
+AtomicDipolesMACE_BEC = add_dR(basecls=AtomicDipolesMACE,
+                                  diff_props=["dipole"],
+                                  rename={"dipole_dR":"BEC"})
+
+AtomicDipolesMACE_MTP_BEC = add_dR(basecls=AtomicDipolesMACE_MTP,
                                   diff_props=["dipole"],
                                   rename={"dipole_dR":"BEC"})
