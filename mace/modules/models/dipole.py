@@ -939,14 +939,17 @@ class AtomicDipolesMACE_MTP(BaseDipoleClass):
             self.products.append(prod)
             if i == num_interactions - 2:
                 self.readouts.append(
-                    NonLinearDipoleReadoutBlock(
-                        hidden_irreps_out, MLP_irreps, gate, dipole_only=True
+                    LinearDipoleReadoutBlock(
+                        hidden_irreps_out, dipole_only=True
                     )
                 )
             else:
                 self.readouts.append(
                     LinearDipoleReadoutBlock(hidden_irreps, dipole_only=True)
                 )
+            # self.readouts.append(
+            #         LinearDipoleReadoutBlock(hidden_irreps_out, dipole_only=self.ES_dipole_only)
+            #     )
 
     def forward(
         self,
