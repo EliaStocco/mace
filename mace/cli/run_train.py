@@ -26,6 +26,8 @@ from mace.tools.scripts_utils import (
     get_dataset_from_xyz,
 )
 
+from mace.modules.models import dipole_models
+from mace.modules.models import import_class
 
 def main() -> None:
     args = tools.build_default_arg_parser().parse_args()
@@ -92,9 +94,10 @@ def main() -> None:
         atomic_energies = None
         # atomic_energies: np.ndarray = np.array(z_table.zs)
         # logging.info(f"Atomic energies: {atomic_energies.tolist()}")
-    elif args.model in ["AtomicDipolesMACE","AtomicDipolesShiftMACE",\
-                      "AtomicDipolesMACElia","AtomicDipolesMACEliaMTP",\
-                        "AtomicDipolesMACEliaBias"]:
+    # elif args.model in ["AtomicDipolesMACE","AtomicDipolesShiftMACE",\
+    #                   "AtomicDipolesMACElia","AtomicDipolesMACEliaMTP",\
+    #                     "AtomicDipolesMACEliaBias"]:
+    elif args.model in dipole_models:
         atomic_energies = None
         dipole_only = True
         compute_dipole = True
@@ -309,28 +312,28 @@ def main() -> None:
             interaction_cls_first=modules.interaction_classes[args.interaction_first],
             MLP_irreps=o3.Irreps(args.MLP_irreps),
         )
-    elif args.model in ["AtomicDipolesMACE","AtomicDipolesShiftMACE",\
-                        "AtomicDipolesMACElia","AtomicDipolesMACEliaMTP",\
-                            "AtomicDipolesMACEliaBias","DipolesPointCharges"]:
+    # elif args.model in ["AtomicDipolesMACE","AtomicDipolesShiftMACE",\
+    #                     "AtomicDipolesMACElia","AtomicDipolesMACEliaMTP",\
+    #                         "AtomicDipolesMACEliaBias","DipolesPointCharges"]:
+    elif args.model in dipole_models:
         # std_df = modules.scaling_classes["rms_dipoles_scaling"](train_loader)
-        assert args.loss == "dipole", "Use dipole loss with AtomicDipolesMACE model"
-        assert (
-            args.error_table == "DipoleRMSE"
-        ), "Use error_table DipoleRMSE with AtomicDipolesMACE model"
-        if args.model == "AtomicDipolesMACE":
-            dipole_class = modules.AtomicDipolesMACE 
-        elif args.model == "AtomicDipolesShiftMACE":
-            dipole_class = modules.AtomicDipolesShiftMACE
-        elif args.model == "AtomicDipolesMACElia":
-            dipole_class = modules.AtomicDipolesMACElia
-        elif args.model == "AtomicDipolesMACEliaMTP":
-            dipole_class = modules.AtomicDipolesMACEliaMTP
-        elif args.model == "AtomicDipolesMACEliaBias":
-            dipole_class = modules.AtomicDipolesMACEliaBias
-        elif args.model == "DipolesPointCharges":
-            dipole_class = modules.DipolesPointCharges
-        else:
-            dipole_class = None
+        assert args.loss == "dipole", "Use dipole loss with {:s} model".format(args.model)
+        assert args.error_table == "DipoleRMSE", "Use error_table DipoleRMSE with AtomicDipolesMACE model"
+        dipole_class = import_class("mace.modules.models",args.model)
+        # if args.model == "AtomicDipolesMACE":
+        #     dipole_class = modules.AtomicDipolesMACE 
+        # elif args.model == "AtomicDipolesShiftMACE":
+        #     dipole_class = modules.AtomicDipolesShiftMACE
+        # elif args.model == "AtomicDipolesMACElia":
+        #     dipole_class = modules.AtomicDipolesMACElia
+        # elif args.model == "AtomicDipolesMACEliaMTP":
+        #     dipole_class = modules.AtomicDipolesMACEliaMTP
+        # elif args.model == "AtomicDipolesMACEliaBias":
+        #     dipole_class = modules.AtomicDipolesMACEliaBias
+        # elif args.model == "DipolesPointCharges":
+        #     dipole_class = modules.DipolesPointCharges
+        # else:
+        #     dipole_class = None
         model = dipole_class(
             **model_config,
             correlation=args.correlation,

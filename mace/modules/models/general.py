@@ -1,4 +1,5 @@
 import torch
+import importlib
 from ase.outputs import _defineprop
 
 class MACEBaseModel(torch.nn.Module):
@@ -55,6 +56,17 @@ def get_model(model_path,model_type,device)->MACEBaseModel:
     #     model = child_class.from_parent(model)
 
     # return model
+
+def import_class(module_name, class_name):
+    try:
+        module = importlib.import_module(module_name)
+        class_instance = getattr(module, class_name)
+        return class_instance
+    except ImportError:
+        print("Module '{}' not found.".format(module_name))
+    except AttributeError:
+        print("Class '{}' not found in module '{}'.".format(class_name, module_name))
+
 
 
 

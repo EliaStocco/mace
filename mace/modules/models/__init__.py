@@ -3,7 +3,7 @@ from .energy import *
 from .energy_dipole import *
 from .derivatives import *
 
-from .general import get_model
+from .general import get_model, import_class
 
 # def get_classes_with_properties(module_name, file_path):
 #     package_path = os.path.dirname(os.path.abspath(__file__))
@@ -31,5 +31,4 @@ from .general import get_model
 # dipole_models = [cls for cls in classes if "dipole" in getattr(cls, "implemented_properties", [])]
 
 energy_models = ["MACE","EnergyDipolesMACE"]
-dipole_models = ["AtomicDipolesMACE","AtomicDipolesMACElia","AtomicDipolesShiftMACE",
-                 "AtomicDipolesMACEliaBias","AtomicDipolesMACEliaMTP","DipolesPointCharges"]
+dipole_models = ["AtomicDipolesMACE","AtomicDipolesMACElia","AtomicDipolesMACE_MTP","DipolesPointCharges"]

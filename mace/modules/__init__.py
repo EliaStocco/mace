@@ -29,19 +29,19 @@ from .loss import (
     WeightedForcesLoss,
     WeightedHuberEnergyForcesStressLoss,
 )
-from .models import (
-    MACE,
-    AtomicDipolesMACE,
-    BOTNet,
-    EnergyDipolesMACE,
-    ScaleShiftBOTNet,
-    ScaleShiftMACE,
-    AtomicDipolesShiftMACE,
-    AtomicDipolesMACElia,
-    AtomicDipolesMACEliaMTP,
-    AtomicDipolesMACEliaBias,
-    DipolesPointCharges,
-)
+# from .models import (
+#     MACE,
+#     AtomicDipolesMACE,
+#     BOTNet,
+#     EnergyDipolesMACE,
+#     ScaleShiftBOTNet,
+#     ScaleShiftMACE,
+#     AtomicDipolesShiftMACE,
+#     AtomicDipolesMACElia,
+#     AtomicDipolesMACEliaMTP,
+#     AtomicDipolesMACEliaBias,
+#     DipolesPointCharges,
+# )
 from .radial import BesselBasis, GaussianBasis, PolynomialCutoff
 from .symmetric_contraction import SymmetricContraction
 from .utils import (
