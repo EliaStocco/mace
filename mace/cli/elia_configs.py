@@ -58,10 +58,19 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="MACE_",
     )
+    parser.add_argument(
+        "--charges_key",
+        help="Key of atomic charges in training xyz",
+        type=str,
+        default="charges",
+    )
     return parser.parse_args()
 
-def make_dataloader(atoms_list:List[Atoms],model:torch.nn.Module,batch_size:int)->torch_geometric.dataloader.DataLoader:
-    configs = [data.config_from_atoms(atoms) for atoms in atoms_list]
+def make_dataloader(atoms_list:List[Atoms],
+                    model:torch.nn.Module,
+                    batch_size:int,
+                    charges_key:str)->torch_geometric.dataloader.DataLoader:
+    configs = [data.config_from_atoms(atoms,charges_key=charges_key) for atoms in atoms_list]
 
     # test
     # atoms = atoms_list[0]
@@ -123,7 +132,7 @@ def main():
     atoms_list = ase.io.read(args.configs, index=":")
 
     # create dataloader
-    data_loader:torch_geometric.dataloader.DataLoader = make_dataloader(atoms_list,model,args.batch_size)
+    data_loader:torch_geometric.dataloader.DataLoader = make_dataloader(atoms_list,model,args.batch_size,charges_key=args.charges_key)
 
     # Collect data
     all_lists = {}
