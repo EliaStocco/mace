@@ -74,7 +74,64 @@ def compute_fixed_charge_dipole_same_unit(
         src=mu, index=batch.unsqueeze(-1), dim=0, dim_size=num_graphs
     )  # [N_graphs,3]
 
+def averaged_learned_compute_fixed_charge_dipole(
+    charges: torch.Tensor,
+    data:Dict[str, torch.Tensor]
+) -> torch.Tensor:
+    
+    
 
+    # Get unique batch indices
+    unique_batches = torch.unique(data['batch'])
+
+    # Iterate over unique batch indices
+    for batch_idx in unique_batches:
+        # Get indices of elements belonging to the current batch
+        batch_indices = torch.nonzero(data['batch'] == batch_idx).squeeze()
+
+        # values, index = torch.unique(data['atomic_numbers'], sorted=False, return_inverse=True)
+        # values[index] == data['atomic_numbers'] --> True
+         # Extract data for the current batch using batch_indices
+        batch = data['batch'][batch_indices]
+        batch_charges = charges[batch_indices]
+        batch_atomic_numbers = data['atomic_numbers'][batch_indices]
+        batch_node_attrs = data['node_attrs'][batch_indices]
+
+        Z = torch.unique(batch_atomic_numbers, sorted=False, return_inverse=False)
+
+        averaged_charges = scatter_mean(batch_charges.unsqueeze(-1) * batch_node_attrs,batch,dim=0)
+        averaged_charges = 1e4 * averaged_charges * Z # optional
+        averaged_charges = torch.round(averaged_charges,decimals=0)
+
+       
+        
+        # Perform computations for the current batch
+        batchwise_results = batch_charges.float() * batch_atomic_numbers.float()
+        average_for_batch = torch.mean(batchwise_results)
+
+
+    # mu = positions * charges.unsqueeze(-1)
+    # return scatter_sum(
+    #     src=mu, index=batch.unsqueeze(-1), dim=0, dim_size=num_graphs
+    # )  # [N_graphs,3]
+    # Compute the product of charges and atomic numbers for each batch
+    batchwise_results = (charges.float() * data['atomic_numbers'].float())[data['batch']]
+
+    # Initialize a tensor to store the sum of batchwise_results for each atomic number
+    sum_per_atomic_number = torch.zeros_like(data['atomic_numbers'], dtype=torch.float)
+
+    # Initialize a tensor to store the count of occurrences of each atomic number
+    count_per_atomic_number = torch.zeros_like(data['atomic_numbers'], dtype=torch.float)
+
+    # Accumulate the sum and count for each atomic number
+    sum_per_atomic_number.scatter_add_(0, data['atomic_numbers'], batchwise_results)
+    count_per_atomic_number.scatter_add_(0, data['atomic_numbers'], torch.ones_like(data['atomic_numbers'], dtype=torch.float))
+
+    # Compute the average for each atomic number (taking care to avoid division by zero)
+    average_per_atomic_number = torch.where(count_per_atomic_number > 0,
+                                            sum_per_atomic_number / count_per_atomic_number,
+                                            torch.zeros_like(sum_per_atomic_number))
+    return 0.
 
 @compile_mode("script")
 class AtomicDipolesMACE(BaseDipoleClass):
@@ -281,6 +338,12 @@ class AtomicDipolesMACE(BaseDipoleClass):
 
 @compile_mode("script")
 class AtomicDipolesMACElia(BaseDipoleClass):
+
+    implemented_properties = {
+        "charges" : (float, "natoms"),
+        **BaseDipoleClass.implemented_properties, 
+    }                             
+
     def __init__(
         self,
         r_max: float,
@@ -498,6 +561,242 @@ class AtomicDipolesMACElia(BaseDipoleClass):
             dim=0,
             dim_size=num_graphs,
         )
+
+        total_dipole = total_dipole + fixed_charges
+
+        output = {
+            "dipole": total_dipole,
+            "charges": charges,
+        }
+        # self._charges = charges # for child classes
+        # self._num_graphs = num_graphs
+        return output
+    
+@compile_mode("script")
+class AtomicDipolesMACElia_Integer(BaseDipoleClass):
+    def __init__(
+        self,
+        r_max: float,
+        num_bessel: int,
+        num_polynomial_cutoff: int,
+        max_ell: int,
+        interaction_cls: Type[InteractionBlock],
+        interaction_cls_first: Type[InteractionBlock],
+        num_interactions: int,
+        num_elements: int,
+        hidden_irreps: o3.Irreps,
+        MLP_irreps: o3.Irreps,
+        avg_num_neighbors: float,
+        atomic_numbers: List[int],
+        correlation: int,
+        gate: Optional[Callable],
+        atomic_energies: Optional[
+            None
+        ],  # Just here to make it compatible with energy models, MUST be None
+        radial_type: Optional[str] = "bessel",
+        radial_MLP: Optional[List[int]] = None,
+    ):
+        self.ES_dipole_only = False
+        super().__init__()
+        self.register_buffer(
+            "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+        )
+        self.register_buffer("r_max", torch.tensor(r_max, dtype=torch.float64))
+        self.register_buffer(
+            "num_interactions", torch.tensor(num_interactions, dtype=torch.int64)
+        )
+        assert atomic_energies is None
+
+        # Embedding
+        node_attr_irreps = o3.Irreps([(num_elements, (0, 1))])
+        node_feats_irreps = o3.Irreps([(hidden_irreps.count(o3.Irrep(0, 1)), (0, 1))])
+        self.node_embedding = LinearNodeEmbeddingBlock(
+            irreps_in=node_attr_irreps, irreps_out=node_feats_irreps
+        )
+        self.radial_embedding = RadialEmbeddingBlock(
+            r_max=r_max,
+            num_bessel=num_bessel,
+            num_polynomial_cutoff=num_polynomial_cutoff,
+            radial_type=radial_type,
+        )
+        edge_feats_irreps = o3.Irreps(f"{self.radial_embedding.out_dim}x0e")
+
+        sh_irreps = o3.Irreps.spherical_harmonics(max_ell)
+        num_features = hidden_irreps.count(o3.Irrep(0, 1))
+        interaction_irreps = (sh_irreps * num_features).sort()[0].simplify()
+        self.spherical_harmonics = o3.SphericalHarmonics(
+            sh_irreps, normalize=True, normalization="component"
+        )
+        if radial_MLP is None:
+            radial_MLP = [64, 64, 64]
+
+        # Interactions and readouts
+        inter = interaction_cls_first(
+            node_attrs_irreps=node_attr_irreps,
+            node_feats_irreps=node_feats_irreps,
+            edge_attrs_irreps=sh_irreps,
+            edge_feats_irreps=edge_feats_irreps,
+            target_irreps=interaction_irreps,
+            hidden_irreps=hidden_irreps,
+            avg_num_neighbors=avg_num_neighbors,
+            radial_MLP=radial_MLP,
+        )
+        self.interactions = torch.nn.ModuleList([inter])
+
+        # Use the appropriate self connection at the first layer
+        use_sc_first = False
+        if "Residual" in str(interaction_cls_first):
+            use_sc_first = True
+
+        node_feats_irreps_out = inter.target_irreps
+        prod = EquivariantProductBasisBlock(
+            node_feats_irreps=node_feats_irreps_out,
+            target_irreps=hidden_irreps,
+            correlation=correlation,
+            num_elements=num_elements,
+            use_sc=use_sc_first,
+        )
+        self.products = torch.nn.ModuleList([prod])
+
+        self.readouts = torch.nn.ModuleList()
+        self.readouts.append(
+            LinearDipoleReadoutBlock(hidden_irreps, dipole_only=self.ES_dipole_only)
+        )
+
+        for i in range(num_interactions - 1):
+            if i == num_interactions - 2:
+                assert (
+                    len(hidden_irreps) > 1
+                ), "To predict dipoles use at least l=1 hidden_irreps"
+                hidden_irreps_out = f'{hidden_irreps[1][0]}x0e+'+str(hidden_irreps[1])
+                # hidden_irreps_out = str(
+                #     hidden_irreps[1]
+                # )  # Select only l=1 vectors for last layer
+            else:
+                hidden_irreps_out = hidden_irreps
+            inter = interaction_cls(
+                node_attrs_irreps=node_attr_irreps,
+                node_feats_irreps=hidden_irreps,
+                edge_attrs_irreps=sh_irreps,
+                edge_feats_irreps=edge_feats_irreps,
+                target_irreps=interaction_irreps,
+                hidden_irreps=hidden_irreps_out,
+                avg_num_neighbors=avg_num_neighbors,
+                radial_MLP=radial_MLP,
+            )
+            self.interactions.append(inter)
+            prod = EquivariantProductBasisBlock(
+                node_feats_irreps=interaction_irreps,
+                target_irreps=hidden_irreps_out,
+                correlation=correlation,
+                num_elements=num_elements,
+                use_sc=True,
+            )
+            self.products.append(prod)
+            if i == num_interactions - 2:
+                self.readouts.append(
+                    NonLinearDipoleReadoutBlock(
+                        hidden_irreps_out, MLP_irreps, gate, dipole_only=self.ES_dipole_only
+                    )
+                )
+            else:
+                self.readouts.append(
+                    LinearDipoleReadoutBlock(hidden_irreps, dipole_only=self.ES_dipole_only)
+                )
+
+        # self._charges = None
+        # self._num_graphs = None
+
+    def forward(
+        self,
+        data: Dict[str, torch.Tensor],
+        training: bool = False,  # pylint: disable=W0613
+        compute_force: bool = False,
+        compute_virials: bool = False,
+        compute_stress: bool = False,
+        compute_displacement: bool = False,
+    ) -> Dict[str, Optional[torch.Tensor]]:
+        assert compute_force is False
+        assert compute_virials is False
+        assert compute_stress is False
+        assert compute_displacement is False
+        # Setup
+        data["node_attrs"].requires_grad_(True)
+        data["positions"].requires_grad_(True)
+        num_graphs = data["ptr"].numel() - 1
+
+        # Embeddings
+        node_feats = self.node_embedding(data["node_attrs"])
+        vectors, lengths = get_edge_vectors_and_lengths(
+            positions=data["positions"],
+            edge_index=data["edge_index"],
+            shifts=data["shifts"],
+        )
+        edge_attrs = self.spherical_harmonics(vectors)
+        edge_feats = self.radial_embedding(lengths)
+
+        # Interactions
+        dipoles = []
+        for interaction, product, readout in zip(
+            self.interactions, self.products, self.readouts
+        ):
+            # print(interaction.irreps_out)
+            node_feats, sc = interaction(
+                node_attrs=data["node_attrs"],
+                node_feats=node_feats,
+                edge_attrs=edge_attrs,
+                edge_feats=edge_feats,
+                edge_index=data["edge_index"],
+            )
+            # print(product.linear.irreps_out)
+            node_feats = product(
+                node_feats=node_feats,
+                sc=sc,
+                node_attrs=data["node_attrs"],
+            )
+            # print(readout.irreps_out)
+            node_dipoles = readout(node_feats).squeeze(-1)  # [n_nodes,3]
+
+            # ensure charge neutrality
+            charges = node_dipoles[:, 0]
+            mean = scatter_mean(charges, data["batch"])
+            charges = charges - mean.index_select(0, data["batch"])
+            node_dipoles[:, 0] = charges
+
+            dipoles.append(node_dipoles)
+
+        # Compute the dipoles
+        contributions_dipoles = torch.stack(
+            dipoles, dim=-1
+        )  # [n_nodes,3,n_contributions]
+        atomic_dipoles = torch.sum(contributions_dipoles, dim=-1)  # [n_nodes,3]
+        # print(atomic_dipoles.shape) # [N_atoms x N_batch,3]
+        charges = atomic_dipoles[:, 0]
+        # charges = torch.round(charges,decimals=0)
+        atomic_dipoles = atomic_dipoles[:, 1:]
+        total_dipole = scatter_sum(
+            src=atomic_dipoles,
+            index=data["batch"],
+            dim=0,
+            dim_size=num_graphs,
+        )  # [n_graphs,3]
+        mean = scatter_mean(charges, data["batch"])
+
+        fixed_charges = averaged_learned_compute_fixed_charge_dipole(charges,data)
+        
+        # Elia Stocco
+        # charges -= mean.index_select(0, data["batch"])
+        # # test = scatter_mean(charges,data['batch'])
+        # # if torch.allclose(test,torch.zeros(test.shape)):
+        # #     raise ValueError("error")
+        # fixed_charges = charges.unsqueeze(1) * data["positions"]
+        # fixed_charges = scatter_sum(
+        #     src=fixed_charges,
+        #     index=data["batch"],
+        #     dim=0,
+        #     dim_size=num_graphs,
+        # )
+
         total_dipole = total_dipole + fixed_charges
 
         output = {
