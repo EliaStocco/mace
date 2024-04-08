@@ -143,7 +143,7 @@ def main():
 
         for k in output.keys():
             if k not in model.implemented_properties:
-                raise ValueError("coding error")
+                print("warning: {:s} not in `model.implemented_properties`".format(k))
             # if 'natoms' in model.implemented_properties[k][1]:
             #     # arrays
             #     pass
@@ -152,12 +152,13 @@ def main():
             # else:
             #     raise ValueError("coding error")
 
-        # for k in whereto.keys():
-        #     if k in output:
-            if k not in all_lists:
-                all_lists[k] = [torch_tools.to_numpy(output[k])]
+            # for k in whereto.keys():
+            #     if k in output:
             else:
-                all_lists[k].append(torch_tools.to_numpy(output[k]))
+                if k not in all_lists:
+                    all_lists[k] = [torch_tools.to_numpy(output[k])]
+                else:
+                    all_lists[k].append(torch_tools.to_numpy(output[k]))
 
     data:Dict[str,np.ndarray] = {}
     for k in all_lists.keys():
