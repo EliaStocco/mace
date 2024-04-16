@@ -1329,6 +1329,7 @@ class AtomicDipolesMACE_MTP(BaseDipoleClass):
         output = {
             "dipole"                 : total_dipole,                            # total        , system
         }
+        extras = {}
         if not training:
             extras = {
                 "delta-dipole"           : delta_dipole,                        # single-valued, system
