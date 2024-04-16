@@ -72,7 +72,7 @@ def compute_fixed_charge_dipole_same_unit(
     mu = positions * charges.unsqueeze(-1)
     return scatter_sum(
         src=mu, index=batch.unsqueeze(-1), dim=0, dim_size=num_graphs
-    )  # [N_graphs,3]
+    ), mu  # [N_graphs,3]
 
 def averaged_learned_compute_fixed_charge_dipole(
     charges: torch.Tensor,
@@ -1120,6 +1120,15 @@ class DipolesPointCharges(BaseDipoleClass):
     
 @compile_mode("script")
 class AtomicDipolesMACE_MTP(BaseDipoleClass):
+
+    implemented_properties = {
+        **BaseDipoleClass.implemented_properties,           # total        , system
+        "delta-dipole"           : (float, 3),              # single-valued, system
+        "baseline"               : (float, 3),              # multi-valued , system
+        "atomic_dipoles"         : (float, ("natoms",3,)),  # total        , atomic
+        "delta-atomic_dipoles"   : (float, ("natoms",3,)),  # single-valued, atomic            
+        "baseline-atomic_dipoles": (float, ("natoms",3,)),  # multi-valued , atomic
+    }
     
     def __init__(
         self,
@@ -1303,22 +1312,29 @@ class AtomicDipolesMACE_MTP(BaseDipoleClass):
             dipoles, dim=-1
         )  # [n_nodes,3,n_contributions]
         atomic_dipoles = torch.sum(contributions_dipoles, dim=-1)  # [n_nodes,3]
-        total_dipole = scatter_sum(
+        delta_dipole = scatter_sum(
             src=atomic_dipoles,
             index=data["batch"],
             dim=0,
             dim_size=num_graphs,
         )  # [n_graphs,3]
-        baseline = compute_fixed_charge_dipole_same_unit(
+        baseline, baseline_atomic = compute_fixed_charge_dipole_same_unit(
             charges=data["charges"],
             positions=data["positions"],
             batch=data["batch"],
             num_graphs=num_graphs,
         )  # [n_graphs,3]
-        total_dipole = total_dipole + baseline
+        total_dipole = delta_dipole + baseline
 
         output = {
-            "dipole": total_dipole,
-            "atomic_dipoles": atomic_dipoles,
+            "dipole"                 : total_dipole,                            # total        , system
         }
-        return output
+        if not training:
+            extras = {
+                "delta-dipole"           : delta_dipole,                        # single-valued, system
+                "baseline"               : baseline,                            # multi-valued , system
+                "atomic_dipoles"         : atomic_dipoles + baseline_atomic,    # total        , atomic
+                "delta-atomic_dipoles"   : atomic_dipoles,                      # single-valued, atomic            
+                "baseline-atomic_dipoles": baseline_atomic,                     # multi-valued , atomic
+            }
+        return {**output, **extras}
