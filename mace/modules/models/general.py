@@ -1,22 +1,24 @@
 import torch
 import importlib
 from ase.outputs import _defineprop
+from typing import TypeVar, Type, Union
+T = TypeVar('T', bound='MACEBaseModel')
 
 class MACEBaseModel(torch.nn.Module):
     implemented_properties:dict
 
-    def __init__(self):
+    def __init__(self:T)->None:
         """Initialize a `MACEBaseModel` object and add its implemented properties to ASE `all_outputs`"""
         super().__init__()
         self.set_prop()
 
-    def set_prop(self):
+    def set_prop(self:T)->None:
         for name,par in self.implemented_properties.items():
             if par is not None:
                 _defineprop(name,*par)
 
     @classmethod
-    def from_parent(cls, obj):
+    def from_parent(cls:Type[T], obj:T)->T:
         """Cast a parent class object to a child class object without copying all the attributes."""
         return obj
 
@@ -34,7 +36,7 @@ class BaseEnergyClass(MACEBaseModel):
         "stress"      : None
     }
 
-def get_model(model_path,model_type,device)->MACEBaseModel:
+def get_model(model_path:str,model_type:str,device:Union[str,torch.device])->MACEBaseModel:
     # Load model
     # print("reading model from file '{:s}'".format(model_path))
     model:MACEBaseModel = torch.load(f=model_path, map_location=device)
@@ -57,7 +59,7 @@ def get_model(model_path,model_type,device)->MACEBaseModel:
 
     # return model
 
-def import_class(module_name, class_name):
+def import_class(module_name:str, class_name:str)->Type[T]:
     try:
         module = importlib.import_module(module_name)
         class_instance = getattr(module, class_name)
