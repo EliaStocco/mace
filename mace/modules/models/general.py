@@ -1,6 +1,6 @@
 import torch
 import importlib
-from ase.outputs import _defineprop
+from ase.outputs import _defineprop, all_outputs
 from typing import TypeVar, Type, Union
 T = TypeVar('T', bound='MACEBaseModel')
 
@@ -15,7 +15,8 @@ class MACEBaseModel(torch.nn.Module):
     def set_prop(self:T)->None:
         for name,par in self.implemented_properties.items():
             if par is not None:
-                _defineprop(name,*par)
+                if name not in all_outputs:
+                    _defineprop(name,*par)
 
     @classmethod
     def from_parent(cls:Type[T], obj:T)->T:
