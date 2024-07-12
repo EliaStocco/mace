@@ -184,7 +184,6 @@ def test_config_types(
             test_by_ct[ind][1].append(conf)
     return test_by_ct
 
-
 def load_from_xyz(
     file_path: str,
     config_type_weights: Dict,
@@ -195,9 +194,51 @@ def load_from_xyz(
     dipole_key: str = "dipole",
     charges_key: str = "charges",
     extract_atomic_energies: bool = False,
+    keep_isolated_atoms: bool = False,
 ) -> Tuple[Dict[int, float], Configurations]:
     atoms_list = ase.io.read(file_path, index=":")
-
+    if energy_key == "energy":
+        logging.info(
+            "Since ASE version 3.23.0b1, using energy_key 'energy' is no longer safe when communicating between MACE and ASE. We recommend using a different key, rewriting energies to 'REF_energy'. You need to use --energy_key='REF_energy', to tell the key name chosen."
+        )
+        energy_key = "REF_energy"
+        for atoms in atoms_list:
+            try:
+                atoms.info["REF_energy"] = atoms.get_potential_energy()
+            except Exception as e:  # pylint: disable=W0703
+                logging.warning(f"Failed to extract energy: {e}")
+                atoms.info["REF_energy"] = None
+    if forces_key == "forces":
+        logging.info(
+            "Since ASE version 3.23.0b1, using forces_key 'forces' is no longer safe when communicating between MACE and ASE. We recommend using a different key, rewriting energies to 'REF_forces'. You need to use --forces_key='REF_forces', to tell the key name chosen."
+        )
+        forces_key = "REF_forces"
+        for atoms in atoms_list:
+            try:
+                atoms.arrays["REF_forces"] = atoms.get_forces()
+            except Exception as e:  # pylint: disable=W0703
+                logging.warning(f"Failed to extract forces: {e}")
+                atoms.arrays["REF_forces"] = None
+    if stress_key == "stress":
+        logging.info(
+            "Since ASE version 3.23.0b1, using stress_key 'stress' is no longer safe when communicating between MACE and ASE. We recommend using a different key, rewriting energies to 'REF_stress'. You need to use --stress_key='REF_stress', to tell the key name chosen."
+        )
+        stress_key = "REF_stress"
+        for atoms in atoms_list:
+            try:
+                atoms.info["REF_stress"] = atoms.get_stress()
+            except Exception as e:  # pylint: disable=W0703
+                atoms.info["REF_stress"] = None
+    if dipole_key == "dipole":
+        logging.info(
+            "Since ASE version 3.23.0b1, using dipole_key 'dipole' is no longer safe when communicating between MACE and ASE. We recommend using a different key, rewriting energies to 'REF_dipole'. You need to use --dipole_key='REF_dipole', to tell the key name chosen."
+        )
+        dipole_key = "REF_dipole"
+        for atoms in atoms_list:
+            try:
+                atoms.info["REF_dipole"] = atoms.get_dipole_moment()
+            except Exception as e:  # pylint: disable=W0703
+                atoms.info["REF_dipole"] = None
     if not isinstance(atoms_list, list):
         atoms_list = [atoms_list]
 
@@ -206,25 +247,27 @@ def load_from_xyz(
         atoms_without_iso_atoms = []
 
         for idx, atoms in enumerate(atoms_list):
-            if len(atoms) == 1:
-                isolated_atom_config = atoms.info.get("config_type") == "IsolatedAtom"
-                if isolated_atom_config:
-                    if energy_key in atoms.info.keys():
-                        atomic_energies_dict[
-                            atoms.get_atomic_numbers()[0]
-                        ] = atoms.info[energy_key]
-                    else:
-                        logging.warning(
-                            f"Configuration '{idx}' is marked as 'IsolatedAtom' "
-                            "but does not contain an energy."
-                        )
+            isolated_atom_config = (
+                len(atoms) == 1 and atoms.info.get("config_type") == "IsolatedAtom"
+            )
+            if isolated_atom_config:
+                if energy_key in atoms.info.keys():
+                    atomic_energies_dict[atoms.get_atomic_numbers()[0]] = atoms.info[
+                        energy_key
+                    ]
+                else:
+                    logging.warning(
+                        f"Configuration '{idx}' is marked as 'IsolatedAtom' "
+                        "but does not contain an energy. Zero energy will be used."
+                    )
+                    atomic_energies_dict[atoms.get_atomic_numbers()[0]] = np.zeros(1)
             else:
                 atoms_without_iso_atoms.append(atoms)
 
         if len(atomic_energies_dict) > 0:
             logging.info("Using isolated atom energies from training file")
-
-        atoms_list = atoms_without_iso_atoms
+        if not keep_isolated_atoms:
+            atoms_list = atoms_without_iso_atoms
 
     configs = config_from_atoms_list(
         atoms_list,
@@ -237,6 +280,59 @@ def load_from_xyz(
         charges_key=charges_key,
     )
     return atomic_energies_dict, configs
+
+# def load_from_xyz(
+#     file_path: str,
+#     config_type_weights: Dict,
+#     energy_key: str = "energy",
+#     forces_key: str = "forces",
+#     stress_key: str = "stress",
+#     virials_key: str = "virials",
+#     dipole_key: str = "dipole",
+#     charges_key: str = "charges",
+#     extract_atomic_energies: bool = False,
+# ) -> Tuple[Dict[int, float], Configurations]:
+#     atoms_list = ase.io.read(file_path, index=":")
+
+#     if not isinstance(atoms_list, list):
+#         atoms_list = [atoms_list]
+
+#     atomic_energies_dict = {}
+#     if extract_atomic_energies:
+#         atoms_without_iso_atoms = []
+
+#         for idx, atoms in enumerate(atoms_list):
+#             if len(atoms) == 1:
+#                 isolated_atom_config = atoms.info.get("config_type") == "IsolatedAtom"
+#                 if isolated_atom_config:
+#                     if energy_key in atoms.info.keys():
+#                         atomic_energies_dict[
+#                             atoms.get_atomic_numbers()[0]
+#                         ] = atoms.info[energy_key]
+#                     else:
+#                         logging.warning(
+#                             f"Configuration '{idx}' is marked as 'IsolatedAtom' "
+#                             "but does not contain an energy."
+#                         )
+#             else:
+#                 atoms_without_iso_atoms.append(atoms)
+
+#         if len(atomic_energies_dict) > 0:
+#             logging.info("Using isolated atom energies from training file")
+
+#         atoms_list = atoms_without_iso_atoms
+
+#     configs = config_from_atoms_list(
+#         atoms_list,
+#         config_type_weights=config_type_weights,
+#         energy_key=energy_key,
+#         forces_key=forces_key,
+#         stress_key=stress_key,
+#         virials_key=virials_key,
+#         dipole_key=dipole_key,
+#         charges_key=charges_key,
+#     )
+#     return atomic_energies_dict, configs
 
 
 def compute_average_E0s(
