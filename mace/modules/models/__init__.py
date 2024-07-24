@@ -30,5 +30,5 @@ from .general import get_model, import_class
 # energy_models = [cls for cls in classes if "energy" in getattr(cls, "implemented_properties", [])]
 # dipole_models = [cls for cls in classes if "dipole" in getattr(cls, "implemented_properties", [])]
 
-energy_models = ["MACE","EnergyDipolesMACE"]
+energy_models = ["MACE","EnergyDipolesMACE","ScaleShiftMACE"]
 dipole_models = ["AtomicDipolesMACE","AtomicDipolesMACElia","AtomicDipolesMACE_MTP","DipolesPointCharges"]

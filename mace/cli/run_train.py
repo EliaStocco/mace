@@ -269,7 +269,8 @@ def main() -> None:
             mean, std = modules.scaling_classes[args.scaling](
                 train_loader, atomic_energies
             )
-        model = modules.ScaleShiftMACE(
+        energy_class = import_class("mace.modules.models",args.model)
+        model = energy_class(
             **model_config,
             correlation=args.correlation,
             gate=modules.gate_dict[args.gate],
@@ -284,7 +285,8 @@ def main() -> None:
         )
     elif args.model == "ScaleShiftMACE":
         mean, std = modules.scaling_classes[args.scaling](train_loader, atomic_energies)
-        model = modules.ScaleShiftMACE(
+        energy_class = import_class("mace.modules.models",args.model)
+        model = energy_class(
             **model_config,
             correlation=args.correlation,
             gate=modules.gate_dict[args.gate],
@@ -297,7 +299,8 @@ def main() -> None:
         )
     elif args.model == "ScaleShiftBOTNet":
         mean, std = modules.scaling_classes[args.scaling](train_loader, atomic_energies)
-        model = modules.ScaleShiftBOTNet(
+        energy_class = import_class("mace.modules.models",args.model)
+        model = energy_class(
             **model_config,
             gate=modules.gate_dict[args.gate],
             interaction_cls_first=modules.interaction_classes[args.interaction_first],
@@ -306,7 +309,8 @@ def main() -> None:
             atomic_inter_shift=mean,
         )
     elif args.model == "BOTNet":
-        model = modules.BOTNet(
+        energy_class = import_class("mace.modules.models",args.model)
+        model = energy_class(
             **model_config,
             gate=modules.gate_dict[args.gate],
             interaction_cls_first=modules.interaction_classes[args.interaction_first],
