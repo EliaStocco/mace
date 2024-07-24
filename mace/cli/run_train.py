@@ -269,7 +269,7 @@ def main() -> None:
             mean, std = modules.scaling_classes[args.scaling](
                 train_loader, atomic_energies
             )
-        energy_class = import_class("mace.modules.models",args.model)
+        energy_class = import_class("mace.modules.models","ScaleShiftMACE")
         model = energy_class(
             **model_config,
             correlation=args.correlation,
