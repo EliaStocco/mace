@@ -272,7 +272,7 @@ class MACE(BaseEnergyClass):
 @compile_mode("script")
 class ScaleShiftMACE(MACE):
 
-    implemented_properties = list()
+    # implemented_properties = list()
 
     def __init__(
         self,
@@ -396,7 +396,7 @@ class ScaleShiftMACE(MACE):
 
 class BOTNet(BaseEnergyClass):
 
-    implemented_properties = list()
+    # implemented_properties = list()
 
     def __init__(
         self,
@@ -520,7 +520,7 @@ class BOTNet(BaseEnergyClass):
 
 class ScaleShiftBOTNet(BOTNet):
 
-    implemented_properties = list()
+    # implemented_properties = list()
 
     def __init__(
         self,
