@@ -30,11 +30,11 @@ class BaseDipoleClass(MACEBaseModel):
 
 class BaseEnergyClass(MACEBaseModel):
     implemented_properties = {
-        "energy"      : None,
-        "free_energy" : None,
-        "node_energy" : None,
-        "forces"      : None,
-        "stress"      : None
+        "energy"      : (float, 1),
+        "free_energy" : (float, 1),
+        "node_energy" : (float, ("natoms", 1)),
+        "forces"      : (float, ("natoms", 3)),
+        "stress"      : (float, (3, 3))
     }
 
 def get_model(model_path:str,model_type:str,device:Union[str,torch.device])->MACEBaseModel:
