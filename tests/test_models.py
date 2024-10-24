@@ -74,7 +74,8 @@ def test_mace():
         correlation=3,
         radial_type="bessel",
     )
-    model = modules.MACE(**model_config)
+    from mace.modules.models import MACE
+    model = MACE(**model_config)
     model_compiled = jit.compile(model)
 
     atomic_data = data.AtomicData.from_config(config, z_table=table, cutoff=3.0)
@@ -119,7 +120,8 @@ def test_dipole_mace():
         correlation=3,
         radial_type="gaussian",
     )
-    model = modules.AtomicDipolesMACE(**model_config)
+    from mace.modules.models import AtomicDipolesMACE
+    model = AtomicDipolesMACE(**model_config)
 
     atomic_data = data.AtomicData.from_config(config, z_table=table, cutoff=3.0)
     atomic_data2 = data.AtomicData.from_config(
@@ -169,7 +171,8 @@ def test_energy_dipole_mace():
         atomic_numbers=table.zs,
         correlation=3,
     )
-    model = modules.EnergyDipolesMACE(**model_config)
+    from mace.modules.models import EnergyDipolesMACE
+    model = EnergyDipolesMACE(**model_config)
 
     atomic_data = data.AtomicData.from_config(config, z_table=table, cutoff=3.0)
     atomic_data2 = data.AtomicData.from_config(
