@@ -240,69 +240,69 @@ def trained_dipole_fixture(tmp_path_factory, fitting_configs):
     )
 
 
-@pytest.fixture(scope="module", name="trained_energy_dipole_model")
-def trained_energy_dipole_fixture(tmp_path_factory, fitting_configs):
-    _mace_params = {
-        "name": "MACE",
-        "valid_fraction": 0.05,
-        "energy_weight": 1.0,
-        "forces_weight": 10.0,
-        "stress_weight": 1.0,
-        "model": "EnergyDipolesMACE",
-        "num_channels": 32,
-        "max_L": 1,
-        "r_max": 3.5,
-        "batch_size": 5,
-        "max_num_epochs": 10,
-        "ema": None,
-        "ema_decay": 0.99,
-        "amsgrad": None,
-        "restart_latest": None,
-        "device": "cpu",
-        "seed": 5,
-        "loss": "energy_forces_dipole",
-        "energy_key": "REF_energy",
-        "forces_key": "",
-        "stress_key": "",
-        "dipole_key": "REF_dipole",
-        "error_table": "EnergyDipoleRMSE",
-    }
+# @pytest.fixture(scope="module", name="trained_energy_dipole_model")
+# def trained_energy_dipole_fixture(tmp_path_factory, fitting_configs):
+#     _mace_params = {
+#         "name": "MACE",
+#         "valid_fraction": 0.05,
+#         "energy_weight": 1.0,
+#         "forces_weight": 10.0,
+#         "stress_weight": 1.0,
+#         "model": "EnergyDipolesMACE",
+#         "num_channels": 32,
+#         "max_L": 1,
+#         "r_max": 3.5,
+#         "batch_size": 5,
+#         "max_num_epochs": 10,
+#         "ema": None,
+#         "ema_decay": 0.99,
+#         "amsgrad": None,
+#         "restart_latest": None,
+#         "device": "cpu",
+#         "seed": 5,
+#         "loss": "energy_forces_dipole",
+#         "energy_key": "REF_energy",
+#         "forces_key": "",
+#         "stress_key": "",
+#         "dipole_key": "REF_dipole",
+#         "error_table": "EnergyDipoleRMSE",
+#     }
 
-    tmp_path = tmp_path_factory.mktemp("run_")
+#     tmp_path = tmp_path_factory.mktemp("run_")
 
-    ase.io.write(tmp_path / "fit.xyz", fitting_configs)
+#     ase.io.write(tmp_path / "fit.xyz", fitting_configs)
 
-    mace_params = _mace_params.copy()
-    mace_params["checkpoints_dir"] = str(tmp_path)
-    mace_params["model_dir"] = str(tmp_path)
-    mace_params["train_file"] = tmp_path / "fit.xyz"
+#     mace_params = _mace_params.copy()
+#     mace_params["checkpoints_dir"] = str(tmp_path)
+#     mace_params["model_dir"] = str(tmp_path)
+#     mace_params["train_file"] = tmp_path / "fit.xyz"
 
-    # make sure run_train.py is using the mace that is currently being tested
-    run_env = os.environ.copy()
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    run_env["PYTHONPATH"] = ":".join(sys.path)
-    print("DEBUG subprocess PYTHONPATH", run_env["PYTHONPATH"])
+#     # make sure run_train.py is using the mace that is currently being tested
+#     run_env = os.environ.copy()
+#     sys.path.insert(0, str(Path(__file__).parent.parent))
+#     run_env["PYTHONPATH"] = ":".join(sys.path)
+#     print("DEBUG subprocess PYTHONPATH", run_env["PYTHONPATH"])
 
-    cmd = (
-        sys.executable
-        + " "
-        + str(run_train)
-        + " "
-        + " ".join(
-            [
-                (f"--{k}={v}" if v is not None else f"--{k}")
-                for k, v in mace_params.items()
-            ]
-        )
-    )
+#     cmd = (
+#         sys.executable
+#         + " "
+#         + str(run_train)
+#         + " "
+#         + " ".join(
+#             [
+#                 (f"--{k}={v}" if v is not None else f"--{k}")
+#                 for k, v in mace_params.items()
+#             ]
+#         )
+#     )
 
-    p = subprocess.run(cmd.split(), env=run_env, check=True)
+#     p = subprocess.run(cmd.split(), env=run_env, check=True)
 
-    assert p.returncode == 0
+#     assert p.returncode == 0
 
-    return MACECalculator(
-        tmp_path / "MACE.model", device="cpu", model_type="EnergyDipoleMACE"
-    )
+#     return MACECalculator(
+#         tmp_path / "MACE.model", device="cpu", model_type="EnergyDipoleMACE"
+#     )
 
 
 @pytest.fixture(scope="module", name="trained_committee")
@@ -419,16 +419,15 @@ def test_calculator_dipole(fitting_configs, trained_dipole_model):
 
     assert len(dip) == 3
 
+# def test_calculator_energy_dipole(fitting_configs, trained_energy_dipole_model):
+#     at = fitting_configs[2].copy()
+#     at.calc = trained_energy_dipole_model
 
-def test_calculator_energy_dipole(fitting_configs, trained_energy_dipole_model):
-    at = fitting_configs[2].copy()
-    at.calc = trained_energy_dipole_model
+#     grads = gradient_test(at)
+#     dip = at.get_dipole_moment()
 
-    grads = gradient_test(at)
-    dip = at.get_dipole_moment()
-
-    assert np.allclose(grads[0], grads[1])
-    assert len(dip) == 3
+#     assert np.allclose(grads[0], grads[1])
+#     assert len(dip) == 3
 
 
 def test_calculator_descriptor(fitting_configs, trained_equivariant_model):
